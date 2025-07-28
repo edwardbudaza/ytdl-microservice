@@ -1,0 +1,182 @@
+#cloud-config
+
+# Update system and install Docker
+package_update: true
+package_upgrade: true
+
+packages:
+  - docker.io
+  - docker-compose
+  - nginx
+  - certbot
+  - python3-certbot-nginx
+  - curl
+  - git
+
+# Create app user
+users:
+  - name: app
+    groups: docker
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+
+# Docker service
+runcmd:
+  # Start and enable Docker
+  - systemctl start docker
+  - systemctl enable docker
+  
+  # Create application directory
+  - mkdir -p /opt/ytdl-app
+  - cd /opt/ytdl-app
+  
+  # Create docker-compose.yml
+  - |
+    cat > docker-compose.yml << 'EOF'
+    version: '3.8'
+    services:
+      ytdl-microservice:
+        image: ${docker_image}
+        container_name: ytdl-microservice
+        ports:
+          - "8000:8000"
+        environment:
+          - API_KEY=${api_key}
+          - AWS_BUCKET_NAME=${aws_bucket_name}
+          - AWS_REGION=${aws_region}
+          - AWS_ACCESS_KEY_ID=${aws_access_key}
+          - AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+          - PYTHONDONTWRITEBYTECODE=1
+          - PYTHONUNBUFFERED=1
+        restart: unless-stopped
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+          interval: 30s
+          timeout: 10s
+          retries: 3
+          start_period: 40s
+    EOF
+  
+  # Create Nginx configuration
+  - |
+    cat > /etc/nginx/sites-available/${domain_name} << 'EOF'
+    server {
+        listen 80;
+        server_name ${domain_name};
+        
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header Referrer-Policy "no-referrer-when-downgrade" always;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/m;
+        
+        location / {
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://localhost:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            # Timeouts for large file uploads
+            proxy_connect_timeout       300s;
+            proxy_send_timeout          300s;
+            proxy_read_timeout          300s;
+            client_max_body_size        1G;
+        }
+        
+        location /health {
+            proxy_pass http://localhost:8000/health;
+            access_log off;
+        }
+    }
+    EOF
+  
+  # Enable Nginx site
+  - ln -sf /etc/nginx/sites-available/${domain_name} /etc/nginx/sites-enabled/
+  - rm -f /etc/nginx/sites-enabled/default
+  - nginx -t && systemctl reload nginx
+  
+  # Create systemd service for the app
+  - |
+    cat > /etc/systemd/system/ytdl-app.service << 'EOF'
+    [Unit]
+    Description=YTDL Microservice
+    Requires=docker.service
+    After=docker.service
+    
+    [Service]
+    Type=oneshot
+    RemainAfterExit=yes
+    WorkingDirectory=/opt/ytdl-app
+    ExecStart=/usr/bin/docker-compose up -d
+    ExecStop=/usr/bin/docker-compose down
+    TimeoutStartSec=0
+    
+    [Install]
+    WantedBy=multi-user.target
+    EOF
+  
+  # Enable and start the service
+  - systemctl daemon-reload
+  - systemctl enable ytdl-app
+  - systemctl start ytdl-app
+  
+  # Wait for app to start
+  - sleep 30
+  
+  # Setup SSL with Let's Encrypt (if domain is properly configured)
+  - |
+    if curl -s --connect-timeout 10 http://${domain_name}/health > /dev/null 2>&1; then
+      certbot --nginx -d ${domain_name} --non-interactive --agree-tos --email admin@${domain_name} --redirect
+    else
+      echo "Domain not accessible yet, skipping SSL setup"
+    fi
+  
+  # Setup log rotation
+  - |
+    cat > /etc/logrotate.d/ytdl-app << 'EOF'
+    /opt/ytdl-app/logs/*.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        notifempty
+        create 644 app app
+        postrotate
+            docker-compose -f /opt/ytdl-app/docker-compose.yml restart > /dev/null 2>&1 || true
+        endscript
+    }
+    EOF
+
+# Create log directory
+write_files:
+  - path: /opt/ytdl-app/logs/.gitkeep
+    content: ""
+    owner: app:app
+    permissions: '0755'
+
+# Final message
+final_message: |
+  YTDL Microservice deployment completed!
+  
+  Service Status:
+  - Docker: Active
+  - Nginx: Active  
+  - YTDL App: Active
+  
+  Access your service at:
+  - http://${domain_name}
+  - Health check: http://${domain_name}/health
+  
+  To check logs:
+  - docker logs ytdl-microservice
+  - journalctl -u ytdl-app
+  
+  To update the application:
+  - cd /opt/ytdl-app
+  - docker-compose pull && docker-compose up -d

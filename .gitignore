@@ -53,3 +53,19 @@ uploads/
 
 # Node if ever used
 node_modules/
+
+# Ignore Terraform state files
+ytdl-microservice-terraform/terraform.tfstate
+ytdl-microservice-terraform/terraform.tfstate.backup
+
+# Ignore Terraform crash logs and plan files
+ytdl-microservice-terraform/crash.log
+ytdl-microservice-terraform/*.tfplan
+
+# Ignore .terraform folder (used for plugins and state cache)
+ytdl-microservice-terraform/.terraform/
+ytdl-microservice-terraform/.terraform.lock.hcl
+
+# Ignore local override files (commonly used for secrets or local testing)
+ytdl-microservice-terraform/terraform.tfvars
+

@@ -1,0 +1,33 @@
+# Oracle Cloud Infrastructure Configuration
+tenancy_ocid     = "ocid1.tenancy.oc1..your-tenancy-ocid"
+user_ocid        = "ocid1.user.oc1..your-user-ocid"
+fingerprint      = "your-key-fingerprint"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "us-ashburn-1"
+compartment_id   = "ocid1.compartment.oc1..your-compartment-ocid"
+availability_domain = "your-availability-domain"
+
+# SSH Key for instance access
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... your-public-key"
+
+# Project Configuration
+project_name = "ytdl-microservice"
+environment  = "prod"
+domain_name  = "ytdl.nibl.ink"
+
+# Instance Configuration
+instance_shape = "VM.Standard.A1.Flex"  # ARM-based, free tier eligible
+
+# Application Secrets
+api_key         = "your-super-secret-api-key-here"
+aws_bucket_name = "your-s3-bucket-name"
+aws_region      = "us-east-1"
+aws_access_key  = "your-aws-access-key"
+aws_secret_key  = "your-aws-secret-key"
+
+# Optional: Load Balancer (for production)
+enable_load_balancer = false
+
+# Optional: SSL Certificates (if using load balancer)
+# ssl_certificate = "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+# ssl_private_key = "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
