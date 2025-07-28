@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+*.log
+
+# dotenv / secrets
+.env
+.env.*
+*.env
+youtube_cookies.txt
+cookies/
+
+# Docker
+*.dockerfile
+Dockerfile.*
+docker-compose.override.yml
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor folders
+.vscode/
+.idea/
+
+# Bytecode and temp
+*.tmp
+*.swp
+*.bak
+*.old
+*.orig
+
+# Output files
+/tmp/
+*.mp4
+*.mkv
+*.webm
+*.json
+*.part
+
+# Python virtualenv
+.venv/
+venv/
+ENV/
+
+# FastAPI static dirs (if any)
+static/
+uploads/
+
+# Node if ever used
+node_modules/

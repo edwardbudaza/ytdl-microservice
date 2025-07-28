@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  ytdl-microservice:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # AWS Configuration
+      - AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
+      - AWS_REGION=${AWS_REGION:-us-east-2}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      
+      # Authentication Configuration
+      - API_KEY=${API_KEY}
+      # Optional: Multiple API keys
+      # - API_KEY_1=${API_KEY_1}
+      # - API_KEY_2=${API_KEY_2}
+      # - API_KEYS=${API_KEYS}  # Comma-separated
+      
+      # Rate Limiting Configuration
+      - RATE_LIMIT_REQUESTS=${RATE_LIMIT_REQUESTS:-100}
+      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-3600}
+      
+      # Application Configuration
+      - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-500}
+      - COOKIE_FILE_PATH=/app/cookies/youtube_cookies.txt
+      
+      # Python Configuration
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    
+    volumes:
+      # Optional: Mount cookies file from host
+      # - ./cookies/youtube_cookies.txt:/app/cookies/youtube_cookies.txt:ro
+      
+      # Optional: Mount logs directory
+      - ./logs:/app/logs
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+# Optional: Add a reverse proxy with SSL
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      # - ./ssl:/etc/nginx/ssl:ro  # For SSL certificates
+    depends_on:
+      - ytdl-microservice
+    restart: unless-stopped
+    profiles:
+      - with-proxy
+
+# Optional: Redis for rate limiting (more scalable)
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    profiles:
+      - with-redis
+
+volumes:
+  redis_data:
