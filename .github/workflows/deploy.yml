@@ -1,0 +1,113 @@
+# .github/workflows/deploy.yml
+name: Deploy to Azure Container Apps
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+  CONTAINER_NAME: ytdl-microservice
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP_NAME }}
+  CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ env.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: |
+          ${{ env.DOCKERHUB_USERNAME }}/${{ env.CONTAINER_NAME }}:${{ github.sha }}
+          ${{ env.DOCKERHUB_USERNAME }}/${{ env.CONTAINER_NAME }}:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Log in to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Azure Container Apps
+      uses: azure/container-apps-deploy-action@v2
+      with:
+        appSourcePath: ${{ github.workspace }}
+        containerAppName: ${{ env.CONTAINER_APP_NAME }}
+        resourceGroup: ${{ env.RESOURCE_GROUP }}
+        imageToDeploy: ${{ env.DOCKERHUB_USERNAME }}/${{ env.CONTAINER_NAME }}:${{ github.sha }}
+        environmentVariables: |
+          AWS_BUCKET_NAME=secretref:aws-bucket-name
+          AWS_REGION=us-east-2
+          AWS_ACCESS_KEY_ID=secretref:aws-access-key-id
+          AWS_SECRET_ACCESS_KEY=secretref:aws-secret-key
+          API_KEY=secretref:api-key
+          RATE_LIMIT_REQUESTS=100
+          RATE_LIMIT_WINDOW=3600
+          MAX_FILE_SIZE_MB=500
+          COOKIE_FILE_PATH=/app/cookies/youtube_cookies.txt
+          PYTHONDONTWRITEBYTECODE=1
+          PYTHONUNBUFFERED=1
+
+  terraform:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.5.0
+
+    - name: Log in to Azure
+      uses: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./ytdl-microservice-terraform-azure
+
+    - name: Terraform Plan
+      run: |
+        terraform plan \
+          -var="aws_bucket_name=${{ secrets.AWS_BUCKET_NAME }}" \
+          -var="aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+          -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+          -var="api_key=${{ secrets.API_KEY }}" \
+          -var="dockerhub_username=${{ vars.DOCKERHUB_USERNAME }}" \
+          -var="dockerhub_password=${{ secrets.DOCKERHUB_TOKEN }}"
+      working-directory: ./terraform
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main'
+      run: |
+        terraform apply -auto-approve \
+          -var="aws_bucket_name=${{ secrets.AWS_BUCKET_NAME }}" \
+          -var="aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}" \
+          -var="aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+          -var="api_key=${{ secrets.API_KEY }}" \
+          -var="dockerhub_username=${{ vars.DOCKERHUB_USERNAME }}" \
+          -var="dockerhub_password=${{ secrets.DOCKERHUB_TOKEN }}"
+      working-directory: ./ytdl-microservice-terraform-azure

@@ -55,17 +55,25 @@ uploads/
 node_modules/
 
 # Ignore Terraform state files
-ytdl-microservice-terraform/terraform.tfstate
-ytdl-microservice-terraform/terraform.tfstate.backup
+ytdl-microservice-terraform-azure/terraform.tfstate
+ytdl-microservice-terraform-azure/terraform.tfstate.backup
+ytdl-microservice-terraform-oracle/terraform.tfstate
+ytdl-microservice-terraform-oracle/terraform.tfstate.backup
 
 # Ignore Terraform crash logs and plan files
-ytdl-microservice-terraform/crash.log
-ytdl-microservice-terraform/*.tfplan
+ytdl-microservice-terraform-azure/crash.log
+ytdl-microservice-terraform-azure/*.tfplan
+ytdl-microservice-terraform-oracle/crash.log
+ytdl-microservice-terraform-oracle/*.tfplan
 
 # Ignore .terraform folder (used for plugins and state cache)
-ytdl-microservice-terraform/.terraform/
-ytdl-microservice-terraform/.terraform.lock.hcl
+ytdl-microservice-terraform-azure/.terraform/
+ytdl-microservice-terraform-azure/.terraform.lock.hcl
+ytdl-microservice-terraform-oracle/.terraform/
+ytdl-microservice-terraform-oracle/.terraform.lock.hcl
 
 # Ignore local override files (commonly used for secrets or local testing)
-ytdl-microservice-terraform/terraform.tfvars
+ytdl-microservice-terraform-azure/terraform.tfvars
+ytdl-microservice-terraform-oracle/terraform.tfvars
 
+.azure
